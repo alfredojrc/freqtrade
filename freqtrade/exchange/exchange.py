@@ -67,6 +67,15 @@ from freqtrade.exchange.common import (
     retrier,
     retrier_async,
 )
+from freqtrade.exchange.exchange_types import (
+    CcxtBalances,
+    CcxtPosition,
+    FtHas,
+    OHLCVResponse,
+    OrderBook,
+    Ticker,
+    Tickers,
+)
 from freqtrade.exchange.exchange_utils import (
     ROUND,
     ROUND_DOWN,
@@ -88,14 +97,6 @@ from freqtrade.exchange.exchange_utils_timeframe import (
     timeframe_to_seconds,
 )
 from freqtrade.exchange.exchange_ws import ExchangeWS
-from freqtrade.exchange.types import (
-    CcxtBalances,
-    CcxtPosition,
-    OHLCVResponse,
-    OrderBook,
-    Ticker,
-    Tickers,
-)
 from freqtrade.misc import (
     chunks,
     deep_merge_dicts,
@@ -122,10 +123,11 @@ class Exchange:
     # Dict to specify which options each exchange implements
     # This defines defaults, which can be selectively overridden by subclasses using _ft_has
     # or by specifying them in the configuration.
-    _ft_has_default: Dict = {
+    _ft_has_default: FtHas = {
         "stoploss_on_exchange": False,
         "stop_price_param": "stopLossPrice",  # Used for stoploss_on_exchange request
         "stop_price_prop": "stopLossPrice",  # Used for stoploss_on_exchange response parsing
+        "stoploss_order_types": {},
         "order_time_in_force": ["GTC"],
         "ohlcv_params": {},
         "ohlcv_candle_limit": 500,
@@ -154,10 +156,10 @@ class Exchange:
         "marketOrderRequiresPrice": False,
         "exchange_has_overrides": {},  # Dictionary overriding ccxt's "has".
         # Expected to be in the format {"fetchOHLCV": True} or {"fetchOHLCV": False}
-        "ws.enabled": False,  # Set to true for exchanges with tested websocket support
+        "ws_enabled": False,  # Set to true for exchanges with tested websocket support
     }
-    _ft_has: Dict = {}
-    _ft_has_futures: Dict = {}
+    _ft_has: FtHas = {}
+    _ft_has_futures: FtHas = {}
 
     _supported_trading_mode_margin_pairs: List[Tuple[TradingMode, MarginMode]] = [
         # TradingMode.SPOT always supported and not required in this list
@@ -261,7 +263,7 @@ class Exchange:
             exchange_conf.get("ccxt_async_config", {}), ccxt_async_config
         )
         self._api_async = self._init_ccxt(exchange_conf, False, ccxt_async_config)
-        self._has_watch_ohlcv = self.exchange_has("watchOHLCV") and self._ft_has["ws.enabled"]
+        self._has_watch_ohlcv = self.exchange_has("watchOHLCV") and self._ft_has["ws_enabled"]
         if (
             self._config["runmode"] in TRADE_MODES
             and exchange_conf.get("enable_ws", True)
@@ -466,7 +468,7 @@ class Exchange:
         """
         return int(
             self._ft_has.get("ohlcv_candle_limit_per_timeframe", {}).get(
-                timeframe, self._ft_has.get("ohlcv_candle_limit")
+                timeframe, str(self._ft_has.get("ohlcv_candle_limit"))
             )
         )
 
